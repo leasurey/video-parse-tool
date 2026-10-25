@@ -5,6 +5,7 @@
 """
 import asyncio
 import copy
+import ipaddress
 import json
 import os
 import re
@@ -932,6 +933,121 @@ async def api_health():
         "error": LIB_ERROR,
         "addresses": server_addresses(),
     }
+
+
+# ============ 缩略图代理 ============
+# 图床（小红书 / 抖音 / B站 等）会校验 Referer 与 UA，浏览器直接 <img src> 常被 403，
+# 表现就是卡片一片黑。这里由后端带同样的头部取图再回传，前端只连本机。
+THUMB_TIMEOUT = 15
+THUMB_MAX_BYTES = 8 * 1024 * 1024
+THUMB_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36")
+
+# 图床 Referer 映射: 必须填「站点来源」, 绝不能填图床自身域名。
+# 实测小红书 sns-img-qc.xhscdn.com: Referer=自身域名 → 403; Referer=www.xiaohongshu.com 或不带 → 正常。
+THUMB_REFERERS = (
+    ("xhscdn.com", "https://www.xiaohongshu.com/"),
+    ("xiaohongshu.com", "https://www.xiaohongshu.com/"),
+    ("douyinpic.com", "https://www.douyin.com/"),
+    ("douyin.com", "https://www.douyin.com/"),
+    ("byteimg.com", "https://www.douyin.com/"),
+    ("toutiaoimg.com", "https://www.toutiao.com/"),
+    ("pstatp.com", "https://www.toutiao.com/"),
+    ("hdslb.com", "https://www.bilibili.com/"),
+    ("bilibili.com", "https://www.bilibili.com/"),
+    ("sinaimg.cn", "https://weibo.com/"),
+    ("qpic.cn", "https://mp.weixin.qq.com/"),
+    ("pipix.com", "https://www.pipix.com/"),
+    ("kuaishou.com", "https://www.kuaishou.com/"),
+)
+
+
+def thumb_referer(url: str) -> str:
+    """按图床域名挑站点 Referer; 未收录的域名返回空串 (宁可不带, 也不自引用)。"""
+    host = (urlparse(url).hostname or "").lower()
+    for suffix, ref in THUMB_REFERERS:
+        if host == suffix or host.endswith("." + suffix):
+            return ref
+    return ""
+
+
+def thumb_url_allowed(url: str) -> bool:
+    """只放行公网 http/https 地址: 解析域名后逐个校验 IP, 挡掉本机与内网 (防 SSRF)。"""
+    try:
+        p = urlparse(url)
+    except Exception:
+        return False
+    if p.scheme not in ("http", "https") or not p.hostname:
+        return False
+    host = p.hostname.lower()
+    if host in ("localhost", "localhost.localdomain") or host.endswith((".local", ".internal")):
+        return False
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except Exception:
+        return False
+    for info in infos:
+        try:
+            addr = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return False
+        if (addr.is_private or addr.is_loopback or addr.is_link_local
+                or addr.is_reserved or addr.is_multicast or addr.is_unspecified):
+            return False
+    return True
+
+
+@app.get("/api/thumb")
+async def api_thumb(url: str = ""):
+    """缩略图代理: 带 Referer/UA 抓取外链图片, 规避图床防盗链。"""
+    u = (url or "").strip()
+    if not u:
+        raise HTTPException(status_code=400, detail="缺少 url 参数")
+    if not thumb_url_allowed(u):
+        raise HTTPException(status_code=400, detail="不允许获取该地址（仅支持公网 http/https 图片）")
+
+    def fetch():
+        base = {
+            "User-Agent": THUMB_UA,
+            "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        }
+
+        def load(headers):
+            with requests.get(u, headers=headers, timeout=THUMB_TIMEOUT, stream=True) as r:
+                r.raise_for_status()
+                ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+                if not ctype.startswith("image/"):
+                    raise ValueError(f"响应不是图片: {ctype or '未知类型'}")
+                buf = bytearray()
+                for chunk in r.iter_content(chunk_size=64 * 1024):
+                    if chunk:
+                        buf.extend(chunk)
+                        if len(buf) > THUMB_MAX_BYTES:
+                            raise ValueError("图片超出 8MB 上限")
+                return bytes(buf), ctype
+
+        # 先按站点来源带 Referer, 再退到不带 Referer; 任一成功即可
+        ref = thumb_referer(u)
+        attempts = [{**base, "Referer": ref}] if ref else []
+        attempts.append(dict(base))
+        last = None
+        for hdr in attempts:
+            try:
+                return load(hdr)
+            except Exception as e:  # noqa: BLE001 - 逐个候选头部重试, 保留最后一个错误
+                last = e
+        raise last if last else RuntimeError("缩略图获取失败")
+
+    try:
+        data, ctype = await asyncio.to_thread(fetch)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"缩略图获取失败: {type(e).__name__}: {e}")
+    return Response(
+        content=data,
+        media_type=ctype,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.post("/api/parse")

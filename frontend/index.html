@@ -413,6 +413,12 @@ video.preview {
   font-size: 10px; line-height: 16px; color: var(--fg); background: rgba(1, 4, 9, .68);
   border-radius: var(--r-pill); padding: 0 6px; font-variant-numeric: tabular-nums;
 }
+/* 缩略图彻底取不到时的占位，避免留一块纯黑 */
+.cell.no-thumb::before {
+  content: "🖼"; position: absolute; inset: 0; display: flex;
+  align-items: center; justify-content: center;
+  font-size: 22px; opacity: .3; pointer-events: none;
+}
 
 /* ============================ 任务 ============================ */
 .task {
@@ -736,6 +742,15 @@ function detectPlatform(url) {
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* 缩略图统一走后端代理：图床校验 Referer/UA，浏览器直连会被 403，卡片就是一片黑 */
+function thumbSrc(u) {
+  const s = String(u || "").trim();
+  if (!s) return "";
+  if (s.startsWith("data:") || s.startsWith("blob:") || s.startsWith("/")) return s;
+  if (s.startsWith(location.origin)) return s;
+  return `/api/thumb?url=${encodeURIComponent(s)}`;
 }
 
 function formatBytes(n) {
@@ -1119,7 +1134,7 @@ function metaChips(item) {
 /* ---------- 视频卡片 ---------- */
 function videoCardHtml(item, idx) {
   const mediaHtml = /\.(mp4|mov|webm)(\?|$)/i.test(item.download_url || "")
-    ? `<video class="preview" controls poster="${esc(item.cover_url || "")}" src="${esc(item.download_url)}"></video>` : "";
+    ? `<video class="preview" controls poster="${esc(thumbSrc(item.cover_url))}" src="${esc(item.download_url)}"></video>` : "";
   const formats = item.formats || [];
   const fmtHtml = formats.length > 1
     ? `<div class="fmt-row">
@@ -1131,7 +1146,7 @@ function videoCardHtml(item, idx) {
        </div>` : "";
   return `
     <div class="item-head">
-      <img class="thumb" src="${esc(item.cover_url || "")}" alt="" onerror="this.style.visibility='hidden'">
+      <img class="thumb" src="${esc(thumbSrc(item.cover_url))}" alt="" onerror="this.style.visibility='hidden'">
       <div class="item-main">
         <h3 class="item-title">${esc(item.title || "(无标题)")}</h3>
         <div class="chips">
@@ -1159,7 +1174,7 @@ function albumCardHtml(item, idx) {
   const cellHtml = ({ c, i }, isLive) => `
     <label class="cell checked" data-cell="${i}">
       <input type="checkbox" checked data-content="${i}">
-      <img loading="lazy" src="${esc(c.thumbnail || c.url)}" alt="" onerror="this.style.opacity=.25">
+      <img loading="lazy" src="${esc(thumbSrc(c.thumbnail || c.cover_url || (c.type === "image" ? c.url : "")))}" alt="" onerror="this.parentElement.classList.add('no-thumb');this.remove()">
       ${isLive ? '<span class="live-badge">▶ 实况</span>' : ""}
       <span class="idx-badge">${i + 1}</span>
     </label>`;
@@ -1180,7 +1195,7 @@ function albumCardHtml(item, idx) {
 
   return `
     <div class="item-head">
-      <img class="thumb" src="${esc(item.cover_url || (contents[0] && contents[0].thumbnail) || "")}" alt="" onerror="this.style.visibility='hidden'">
+      <img class="thumb" src="${esc(thumbSrc(item.cover_url || (contents[0] && (contents[0].thumbnail || contents[0].cover_url))))}" alt="" onerror="this.style.visibility='hidden'">
       <div class="item-main">
         <h3 class="item-title">${esc(item.title || "(无标题)")}</h3>
         <div class="chips">
