@@ -1,0 +1,12 @@
+{
+  "host": "0.0.0.0",
+  "port": 8000,
+  "lan_access": true,
+  "download_dir": "downloads",
+  "max_concurrent_downloads": 2,
+  "download_threads": 8,
+  "open_browser": true,
+  "cookies": {},
+  "output_format": "mp4",
+  "keep_original_after_remux": false
+}

@@ -1,0 +1,24 @@
+# 虚拟环境与依赖
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# 运行期产物
+downloads/
+logs/
+bin/
+*.log
+
+# 参考用第三方源码与压缩包
+libs/
+*.tar.gz
+
+# 本地配置（可能含 Cookie 等私密信息，仓库只提供 config.example.json）
+config.json
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

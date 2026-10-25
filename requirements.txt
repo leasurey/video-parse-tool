@@ -1,0 +1,9 @@
+# 运行时依赖（install.bat 会读取本文件安装）
+# 说明：videofetch 即开源项目 videodl（CharlesPikachu/videodl），
+# 许可证为 PolyForm-Noncommercial-1.0.0 —— 仅允许非商业用途。
+fastapi>=0.110
+uvicorn>=0.27
+requests>=2.31
+videofetch>=0.9.1
+imageio-ffmpeg>=0.4.9
+segno>=1.6
