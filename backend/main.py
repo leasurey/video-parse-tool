@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
 # ============ 项目版本（唯一权威值，界面页脚与 CHANGELOG 均以此为准） ============
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 
 # ============ 基础路径 ============
 BASE = Path(__file__).resolve().parent.parent

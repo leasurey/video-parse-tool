@@ -1,0 +1,17 @@
+# 统一换行符，避免跨平台克隆后批处理失效
+* text=auto
+
+# Windows 批处理/PowerShell 脚本必须使用 CRLF，
+# 否则 cmd.exe 在部分场景下解析 if (...) 多行块会出错
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# 其余文本保持 LF
+*.py   text eol=lf
+*.js   text eol=lf
+*.html text eol=lf
+*.css  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.txt  text eol=lf

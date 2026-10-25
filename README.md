@@ -6,7 +6,7 @@
 
 粘贴视频链接（或抖音 / 小红书 / B站 / 皮皮虾等 App 的分享文本），自动识别平台、解析直链并下载到本地。
 
-[![Version](https://img.shields.io/badge/version-1.0.0-4f8cff)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.1-4f8cff)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-MIT%20·%20非商业依赖-3fb950)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776ab)](requirements.txt)
 [![Platform](https://img.shields.io/badge/platform-Windows%20·%20Web%20·%20手机局域网-a371f7)](#-手机--局域网访问)
@@ -241,6 +241,14 @@ node scripts\test_ui_render.js
 下载任务全流程、局域网弹窗等，当前共 **68 项**。
 
 ## 🧾 测试验证记录
+
+### 2026-10-25 V1.0.1（批处理编码修复）
+
+| 测试项 | 结果 |
+| --- | --- |
+| 三个 `.bat` 字节检查 | 非 ASCII 字节数均为 0；CRLF 换行（`start.bat` 26 处、`install.bat` 57 处、`allow_lan.bat` 50 处） |
+| 批处理解析实测 | 用替换掉启动命令的副本走完 `start.bat` 全流程：分支判断、提示输出、目标命令拼接均正确，无乱码、无命令截断 |
+| 原缺陷复现记录 | 修复前中文系统报 `'hon.exe' 不是内部或外部命令`（`python.exe` 被截断）与 `'氭嫙鐜' 不是内部或外部命令`（"虚拟环境"乱码） |
 
 ### 2026-10-25 V1.0.0（操作流程优化）
 
